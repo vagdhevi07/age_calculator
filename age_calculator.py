@@ -1,10 +1,12 @@
+from flask import Flask, render_template, request
 import time
 from calendar import isleap
+
+app = Flask(__name__)
 
 # judge the leap year
 def judge_leap_year(year):
     return isleap(year)
-
 
 # returns the number of days in each month
 def month_days(month, leap_year):
@@ -18,54 +20,56 @@ def month_days(month, leap_year):
         return 28
 
 
-# ---------- INPUT ----------
-name = input("Enter your name: ")
+def calculate_age(dob_year, dob_month, dob_day, choice):
+    current_time = time.localtime()
+    cur_year = current_time.tm_year
+    cur_month = current_time.tm_mon
+    cur_day = current_time.tm_mday
 
-dob_year = int(input("Enter birth year (YYYY): "))
-dob_month = int(input("Enter birth month (MM): "))
-dob_day = int(input("Enter birth day (DD): "))
+    days = 0
 
-choice = input("Show age in (years / months / days): ").lower()
+    # full years
+    for y in range(dob_year, cur_year):
+        days += 366 if judge_leap_year(y) else 365
 
-# ---------- CURRENT DATE ----------
-current_time = time.localtime()
-cur_year = current_time.tm_year
-cur_month = current_time.tm_mon
-cur_day = current_time.tm_mday
+    # full months of current year
+    leap = judge_leap_year(cur_year)
+    for m in range(1, cur_month):
+        days += month_days(m, leap)
 
-# ---------- CALCULATE TOTAL DAYS ----------
-days = 0
+    # add days of current month
+    days += cur_day
 
-# full years
-for y in range(dob_year, cur_year):
-    days += 366 if judge_leap_year(y) else 365
+    # subtract days before DOB
+    leap_birth = judge_leap_year(dob_year)
+    for m in range(1, dob_month):
+        days -= month_days(m, leap_birth)
 
-# full months of current year
-leap = judge_leap_year(cur_year)
-for m in range(1, cur_month):
-    days += month_days(m, leap)
+    days -= (dob_day - 1)
 
-# add days of current month
-days += cur_day
+    if choice == "years":
+        return f"Age is approximately {days // 365} years"
+    elif choice == "months":
+        return f"Age is approximately {days // 30} months"
+    else:
+        return f"Age is {days} days"
 
-# subtract days before DOB in birth year
-leap_birth = judge_leap_year(dob_year)
-for m in range(1, dob_month):
-    days -= month_days(m, leap_birth)
 
-days -= (dob_day - 1)
+@app.route("/", methods=["GET", "POST"])
+def index():
+    result = ""
+    if request.method == "POST":
+        name = request.form["name"]
+        dob_year = int(request.form["year"])
+        dob_month = int(request.form["month"])
+        dob_day = int(request.form["day"])
+        choice = request.form["choice"]
 
-# ---------- OUTPUT ----------
-if choice == "years":
-    age = days // 365
-    print(f"{name}'s age is approximately {age} years")
+        age_result = calculate_age(dob_year, dob_month, dob_day, choice)
+        result = f"{name}'s {age_result}"
 
-elif choice == "months":
-    age = days // 30
-    print(f"{name}'s age is approximately {age} months")
+    return render_template("index.html", result=result)
 
-elif choice == "days":
-    print(f"{name}'s age is {days} days")
 
-else:
-    print("Invalid choice! Please select years, months, or days.")
+if __name__ == "__main__":
+    app.run(debug=True)
